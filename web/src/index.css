@@ -1,0 +1,65 @@
+@import "maplibre-gl/dist/maplibre-gl.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* -------------------------------------------------------------------------
+   MIZAN design tokens (docs/13 §A.2). Semantic colors are RGB triples so
+   Tailwind's `<alpha-value>` works. Light is default; .dark overrides.
+   ------------------------------------------------------------------------- */
+@layer base {
+  :root {
+    --background: 248 250 252; /* surface.light */
+    --foreground: 15 23 42;
+    --card: 255 255 255;
+    --card-foreground: 15 23 42;
+    --muted: 241 245 249;
+    --muted-foreground: 100 116 139;
+    --border: 226 232 240;
+  }
+
+  .dark {
+    --background: 15 23 42; /* surface.dark */
+    --foreground: 248 250 252;
+    --card: 30 41 59;
+    --card-foreground: 248 250 252;
+    --muted: 30 41 59;
+    --muted-foreground: 148 163 184;
+    --border: 51 65 85;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+
+  /* Visible keyboard focus everywhere (docs/13 §A.5). */
+  :focus-visible {
+    @apply outline-none ring-2 ring-brand-cobalt ring-offset-2 ring-offset-background;
+  }
+
+  /* Respect reduced motion (docs/13 §A.5). */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
+    }
+  }
+}
+
+/* MapLibre popups/controls inherit theme colors. */
+.maplibregl-popup-content {
+  @apply bg-card text-card-foreground rounded-lg shadow-lg text-sm;
+}
+.maplibregl-ctrl-attrib {
+  font-size: 10px;
+}
