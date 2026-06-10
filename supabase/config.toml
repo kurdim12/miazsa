@@ -1,0 +1,151 @@
+# =============================================================================
+# supabase/config.toml
+# MIZAN — Local Supabase Development Configuration
+# Apply with: supabase start  (reads this file automatically)
+# Docs: https://supabase.com/docs/guides/local-development
+# =============================================================================
+
+project_id = "mizan"
+
+# ---------------------------------------------------------------------------
+# [api] — PostgREST settings
+# ---------------------------------------------------------------------------
+[api]
+enabled       = true
+port          = 54321
+schemas       = ["public", "storage", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows      = 1000
+
+# ---------------------------------------------------------------------------
+# [api.tls] — TLS for local API (disabled in local dev; enabled in prod)
+# ---------------------------------------------------------------------------
+[api.tls]
+enabled = false
+
+# ---------------------------------------------------------------------------
+# [db] — PostgreSQL instance settings
+# ---------------------------------------------------------------------------
+[db]
+port          = 54322
+shadow_port   = 54320
+major_version = 15
+
+# ---------------------------------------------------------------------------
+# [db.pooler] — PgBouncer connection pooling
+# ---------------------------------------------------------------------------
+[db.pooler]
+enabled           = false
+port              = 54329
+pool_mode         = "transaction"
+default_pool_size = 20
+max_client_conn   = 100
+
+# ---------------------------------------------------------------------------
+# [realtime] — Supabase Realtime (broadcast/presence/DB changes)
+# ---------------------------------------------------------------------------
+[realtime]
+enabled = true
+ip_address = "0.0.0.0"
+
+# ---------------------------------------------------------------------------
+# [studio] — Supabase Studio (local dashboard)
+# ---------------------------------------------------------------------------
+[studio]
+enabled      = true
+port         = 54323
+api_url      = "http://127.0.0.1"
+openai_api_key = "env(OPENAI_API_KEY)"
+
+# ---------------------------------------------------------------------------
+# [inbucket] — Local email testing (password reset, magic links)
+# ---------------------------------------------------------------------------
+[inbucket]
+enabled     = true
+port        = 54324
+smtp_port   = 54325
+pop3_port   = 54326
+
+# ---------------------------------------------------------------------------
+# [storage] — Supabase Storage (file uploads: reports, tiles, model artifacts)
+# ---------------------------------------------------------------------------
+[storage]
+enabled              = true
+file_size_limit      = "50MiB"
+image_transformation = { enabled = false }
+
+# ---------------------------------------------------------------------------
+# [storage.s3_credentials] — Local S3-compatible storage (Minio)
+# ---------------------------------------------------------------------------
+[storage.s3_credentials]
+access_key_id     = "env(STORAGE_ACCESS_KEY_ID)"
+secret_access_key = "env(STORAGE_SECRET_ACCESS_KEY)"
+region            = "local"
+
+# ---------------------------------------------------------------------------
+# [auth] — Supabase Auth settings
+# ---------------------------------------------------------------------------
+[auth]
+enabled                  = true
+site_url                 = "http://127.0.0.1:5173"
+additional_redirect_urls = ["https://mizan.app", "https://staging.mizan.app"]
+jwt_expiry               = 3600    # 1 hour access token (docs/17 §2.1)
+enable_signup            = true
+enable_anonymous_sign_ins = false
+minimum_password_length  = 12
+
+# ---------------------------------------------------------------------------
+# [auth.email] — Email provider
+# ---------------------------------------------------------------------------
+[auth.email]
+enable_signup         = true
+double_confirm_changes = true
+enable_confirmations  = false   # disabled locally; enabled in staging/prod
+
+# ---------------------------------------------------------------------------
+# [auth.sms] — SMS provider (disabled; not used in Phase 1)
+# ---------------------------------------------------------------------------
+[auth.sms]
+enable_signup         = false
+enable_confirmations  = false
+
+# ---------------------------------------------------------------------------
+# [edge_runtime] — Deno Edge Functions runtime
+# ---------------------------------------------------------------------------
+[edge_runtime]
+enabled   = true
+policy    = "oneshot"
+inspector_port = 8083
+
+# ---------------------------------------------------------------------------
+# [functions] — Edge Function declarations
+# Each function maps to supabase/functions/<name>/index.ts
+# ---------------------------------------------------------------------------
+[functions.ee-compute]
+verify_jwt = true
+
+[functions.risk-score]
+verify_jwt = true
+
+[functions.confidence]
+verify_jwt = true
+
+[functions.ai-insights]
+verify_jwt = true
+
+[functions.tiles]
+verify_jwt = false    # public tile endpoint; rate-limited by function logic
+
+[functions.report-generate]
+verify_jwt = true
+
+[functions.scenario-run]
+verify_jwt = true
+
+# ---------------------------------------------------------------------------
+# [analytics] — Logflare analytics (disabled locally)
+# ---------------------------------------------------------------------------
+[analytics]
+enabled   = false
+port      = 54327
+backend   = "postgres"
