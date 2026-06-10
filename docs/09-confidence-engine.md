@@ -301,6 +301,30 @@ Matches doc 08 §7 (~0.69–0.70). Explanation: *"Medium (0.70); GRACE input (0.
 
 ---
 
+## 8a. Failure modes and guardrails
+
+The engine must degrade gracefully and never overstate trust:
+
+- **All required factors missing.** If no applicable factor can be scored, `confidence` is `null` (not a fabricated default); the value is shown as "confidence unavailable" and treated as Low for gating purposes.
+- **Single fatal factor.** Because aggregation is geometric, one near-zero factor (e.g. spatial_coverage ≈ 0 from total cloud) correctly forces confidence ≈ 0 — this is intended, not a bug.
+- **Stale-but-only data.** A very stale value (low freshness) is still surfaced when it is the best available, but with an explicit Low/Medium badge and an explanation naming freshness as the limiter; it must never be silently presented as current.
+- **Model-validation leakage.** `model_validation` is taken from the held-out cross-val metric stored in `models.metrics`, never from training fit, so confidence cannot be inflated by overfitting.
+- **Convergence with correlated inputs.** `convergence` must combine **independent** indicators (e.g. optical NDVI vs SAR backscatter); two near-identical sources would give false agreement, so the configuration declares which indicator pairs count as independent.
+- **Clamping.** All factor outputs and the final score are clamped to [0,1]; any out-of-range intermediate (e.g. `n_observations > n_expected`) is clipped and logged.
+
+## 8b. Factor applicability matrix (compact)
+
+| Factor | Optical | SAR | Precip/SPI | Climate/ET | Crop/irrig | Water balance | GRACE |
+|---|---|---|---|---|---|---|---|
+| freshness | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| source_quality | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| spatial_coverage | ✓ | ✓ | domain | domain | ✓ | domain | low wt |
+| temporal_completeness | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| model_validation | — | — | — | — | ✓ | ✓ | — |
+| convergence | ✓ | — | ✓ | — | ✓ | ✓ | — |
+
+(— = dropped and weight renormalised per §4.2.)
+
 ## 9. API exposure
 
 A dedicated **confidence Edge Function** assembles the Validation Envelope; details in [12-api-specification](./12-api-specification.md).
