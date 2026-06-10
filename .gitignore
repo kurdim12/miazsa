@@ -1,0 +1,68 @@
+# ---- Node / Frontend (Vite + React + TS) ----
+node_modules/
+dist/
+dist-ssr/
+build/
+.vite/
+*.local
+coverage/
+.eslintcache
+.turbo/
+
+# ---- Environment & secrets (NEVER commit) ----
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+service-account*.json
+gee-service-account*.json
+credentials.json
+secrets/
+
+# ---- Python (EE Worker) ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# ---- Supabase ----
+.supabase/
+supabase/.branches/
+supabase/.temp/
+
+# ---- Geospatial / data artifacts (keep raw EO data out of git) ----
+*.tif
+*.tiff
+*.geotiff
+*.cog.tif
+*.nc
+*.hdf
+*.zip
+*.gpkg
+data/raw/
+data/interim/
+data/cache/
+exports/
+tiles_cache/
+
+# ---- Logs & temp ----
+*.log
+logs/
+tmp/
+.tmp/
+
+# ---- OS / Editor ----
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.shared.json
+*.swp
