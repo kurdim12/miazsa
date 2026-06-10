@@ -127,6 +127,8 @@ The demo state is a **frozen snapshot** of real EO-computed results for Azraq Ba
 
 ### 3.2 Demo State Contents
 
+> **Specification note.** Demo-state figures shown throughout this document — including the JSON below — are **illustrative of structure and format**, using realistic placeholder values for Azraq; they are **not** actual measurements. In the running system the demo snapshot is populated *exclusively* with **real values computed by the MIZAN Earth Engine pipeline** (see [05-earth-engine-pipelines](./05-earth-engine-pipelines.md)), carried with full provenance and confidence — never hand-entered. Until those pipelines have run, treat every demo figure here as illustrative.
+
 ```json
 {
   "snapshot_id":    "demo-azraq-q3-2023",
@@ -134,7 +136,7 @@ The demo state is a **frozen snapshot** of real EO-computed results for Azraq Ba
   "region_id":      "uuid-azraq",
   "reference_date": "2023-09-30",
   "label":          "Demo Snapshot — Azraq Basin Q3 2023",
-  "note":           "Real EO-computed values. Frozen for reproducible evaluation.",
+  "note":           "Illustrative values for this specification; the production snapshot holds real EO-computed values, frozen for reproducible evaluation.",
 
   "indicators": {
     "ndvi":                    { "value": 0.21,  "unit": "index",  "confidence": "High",   "confidence_score": 0.88 },

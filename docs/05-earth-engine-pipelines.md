@@ -7,7 +7,7 @@
 | Version | 0.1 (Draft) |
 | Status | Phase 1 — Specification |
 | Last updated | 2026-06-10 |
-| Related | [03 — System Architecture](./03-system-architecture.md), [04 — Data Sources](./04-data-sources.md), [06 — Remote Sensing Methods](./06-remote-sensing-methods.md), [07 — Machine Learning](./07-machine-learning.md), [08 — Risk Scoring](./08-risk-scoring.md), [09 — Confidence Engine](./09-confidence-engine.md), [11 — Database Schema](./11-database-schema.md), [12 — API Specification](./12-api-specification.md), [16 — Validation Framework](./16-validation-framework.md), [18 — Observability & Operations](./18-observability-operations.md) |
+| Related | [03 — System Architecture](./03-system-architecture.md), [04 — Data Sources](./04-data-sources.md), [06 — Remote Sensing Methods](./06-remote-sensing-methods.md), [07 — Machine Learning](./07-machine-learning.md), [08 — Risk Scoring](./08-risk-scoring.md), [09 — Confidence Engine](./09-confidence-engine.md), [11 — Database Schema](./11-database-schema.md), [12 — API Specification](./12-api-specification.md), [16 — Validation Framework](./16-validation-framework.md), [18 — Deployment](./18-deployment.md) |
 
 ## Purpose
 
@@ -193,7 +193,7 @@ def acquire_job(db, spec):
 Two distinct retry domains:
 
 - **Transient EE / network errors** (HTTP 429 quota, 500/503, `ee.EEException: Earth Engine memory capacity exceeded`, timeouts): retried **inside** the worker with **exponential backoff + full jitter**, capped attempts. Some errors are *non-retryable* by backoff alone (memory capacity exceeded) and instead trigger a **degradation strategy** (coarser `scale`, tiling the AOI, splitting the date range) before a final failure.
-- **Whole-job failures:** if the worker NACKs (raises), Pub/Sub redelivers per the subscription's retry policy. After `max_delivery_attempts` (e.g., 5), the message is routed to the **dead-letter topic** `mizan-ee-dlq`, which alerts Observability ([18](./18-observability-operations.md)) and records the failure in `provenance` / `jobs` with the captured exception.
+- **Whole-job failures:** if the worker NACKs (raises), Pub/Sub redelivers per the subscription's retry policy. After `max_delivery_attempts` (e.g., 5), the message is routed to the **dead-letter topic** `mizan-ee-dlq`, which alerts Observability ([18](./18-deployment.md)) and records the failure in `provenance` / `jobs` with the captured exception.
 
 ```python
 import random, time
@@ -225,7 +225,7 @@ EE enforces concurrency and compute quotas; runaway `getInfo` over huge regions 
   - **EE asset cache:** `Export.image.toAsset(...)` to a project asset (e.g., `projects/mizan/assets/composites/s2_JJA_2025`) with a deterministic asset id derived from the idempotency key. Subsequent pipelines load the cached asset instead of recomputing.
   - **COG cache:** large rasters exported as **Cloud-Optimized GeoTIFF** to GCS for the visualization layer and for offline/Landsat-harmonization reuse.
   - **Result cache:** `indicator_values` rows themselves act as a cache — the idempotency guard prevents recompute for an already-SUCCEEDED `(pipeline, aoi, period, version)`.
-- **Cost telemetry.** Each job records `image_count`, wall-clock, and (where available) EE `EECU`-seconds proxy into `provenance.parameters` for cost dashboards ([18](./18-observability-operations.md)).
+- **Cost telemetry.** Each job records `image_count`, wall-clock, and (where available) EE `EECU`-seconds proxy into `provenance.parameters` for cost dashboards ([18](./18-deployment.md)).
 
 ### 1.9 Provenance capture (every job)
 
@@ -724,7 +724,7 @@ Derived/secondary indicators (`ndvi_anomaly`, `recharge_proxy_mm`, `abstraction_
 
 ### 3.2 Error handling & monitoring
 
-This subsection coordinates with [16 — Validation Framework](./16-validation-framework.md) (scientific correctness / accuracy gates) and [18 — Observability & Operations](./18-observability-operations.md) (operational health, alerting, dashboards).
+This subsection coordinates with [16 — Validation Framework](./16-validation-framework.md) (scientific correctness / accuracy gates) and [18 — Deployment](./18-deployment.md) (operational health, alerting, dashboards).
 
 **Failure taxonomy & handling.**
 
@@ -739,7 +739,7 @@ This subsection coordinates with [16 — Validation Framework](./16-validation-f
 | Repeated job failure | Pub/Sub delivery count | route to `mizan-ee-dlq` → alert (18) |
 | Duplicate delivery | idempotency guard (§1.6) | ack + skip |
 
-**Monitoring signals emitted (to [18](./18-observability-operations.md)).** Per job: status, duration, `image_count`, masked/valid-pixel fraction, retry count, EE error class, degradation events, and a cost proxy. SLO examples: interactive `ee-compute` p95 enqueue→result < 90 s for single-AOI/single-date; batch national sweep completion within the scheduled window; DLQ rate ≈ 0. Every SUCCEEDED job's `provenance` row is the audit record consumed by the [16](./16-validation-framework.md) Source/Date/Methodology/Confidence/Explanation envelope.
+**Monitoring signals emitted (to [18](./18-deployment.md)).** Per job: status, duration, `image_count`, masked/valid-pixel fraction, retry count, EE error class, degradation events, and a cost proxy. SLO examples: interactive `ee-compute` p95 enqueue→result < 90 s for single-AOI/single-date; batch national sweep completion within the scheduled window; DLQ rate ≈ 0. Every SUCCEEDED job's `provenance` row is the audit record consumed by the [16](./16-validation-framework.md) Source/Date/Methodology/Confidence/Explanation envelope.
 
 **Data-integrity invariants (enforced, non-negotiable).**
 - No `indicator_values` row without a corresponding `provenance` row (FK + check).
