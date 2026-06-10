@@ -25,26 +25,21 @@
 
 import { handlePreflight } from "_shared/cors.ts";
 import { serviceClient } from "_shared/supabase.ts";
+import { fail, guard, newRequestId, ok, parseJson, PROCESSING_VERSION } from "_shared/http.ts";
 import {
-  fail,
-  guard,
-  newRequestId,
-  ok,
-  parseJson,
-  PROCESSING_VERSION,
-} from "_shared/http.ts";
-import {
-  aggregate,
   abstractionPressure,
+  aggregate,
   rechargeDeficit,
   regionalStorageGrace,
-  RISK_KEYS,
   RISK_WEIGHTS,
   surfaceWaterDecline,
   vegWaterDivergence,
 } from "_shared/risk.ts";
 import { levelFromScore, weightedGeometricMean } from "_shared/confidence.ts";
 import type {
+  ConfidenceFactors,
+  ConfidenceLevel,
+  ConfidenceObject,
   Period,
   Provenance,
   RegionRow,
@@ -172,11 +167,21 @@ Deno.serve(async (req: Request): Promise<Response> => {
       .limit(1)
       .maybeSingle();
     if (exErr) {
-      return fail(req, "INTERNAL", `Existing-score lookup failed: ${exErr.message}`, undefined, requestId);
+      return fail(
+        req,
+        "INTERNAL",
+        `Existing-score lookup failed: ${exErr.message}`,
+        undefined,
+        requestId,
+      );
     }
     if (existing) {
       const prov = await loadProvenance(svc, existing.provenance_id as string);
-      const conf = await loadRiskConfidence(svc, existing.id as string, existing.confidence as number | null);
+      const conf = await loadRiskConfidence(
+        svc,
+        existing.id as string,
+        existing.confidence as number | null,
+      );
       return ok(
         req,
         {
@@ -213,13 +218,17 @@ Deno.serve(async (req: Request): Promise<Response> => {
     .select("id, code")
     .in("code", uniqueCodes);
   if (indErr) {
-    return fail(req, "INTERNAL", `Indicator catalog read failed: ${indErr.message}`, undefined, requestId);
+    return fail(
+      req,
+      "INTERNAL",
+      `Indicator catalog read failed: ${indErr.message}`,
+      undefined,
+      requestId,
+    );
   }
   const idToCode = new Map<string, string>();
-  const codeToId = new Map<string, string>();
-  for (const row of indicatorRows ?? []) {
+  for (const row of (indicatorRows ?? []) as Array<Record<string, unknown>>) {
     idToCode.set(row.id as string, row.code as string);
-    codeToId.set(row.code as string, row.id as string);
   }
 
   const indicatorIds = [...idToCode.keys()];
@@ -235,10 +244,16 @@ Deno.serve(async (req: Request): Promise<Response> => {
       .lte("obs_date", period.end)
       .order("obs_date", { ascending: false });
     if (valErr) {
-      return fail(req, "INTERNAL", `Indicator values read failed: ${valErr.message}`, undefined, requestId);
+      return fail(
+        req,
+        "INTERNAL",
+        `Indicator values read failed: ${valErr.message}`,
+        undefined,
+        requestId,
+      );
     }
     // First row per indicator_id is the most recent (DESC order).
-    for (const v of values ?? []) {
+    for (const v of (values ?? []) as Array<Record<string, unknown>>) {
       const code = idToCode.get(v.indicator_id as string);
       if (!code) continue;
       if (!inputsByCode.has(code)) {
@@ -342,23 +357,23 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
   // Build a confidence object whose "factors" expose each sub-index's inherited
   // confidence + its active weight (transparent breakdown for the UI/judge).
-  const riskConfidence = riskScore === null
-    ? null
-    : {
+  let riskConfidence: ConfidenceObject | null = null;
+  if (riskScore !== null) {
+    const riskFactors: ConfidenceFactors = {};
+    for (const k of agg.contributing) {
+      const c = subindexConfidence[k];
+      if (c === null) continue;
+      riskFactors[k] = {
+        value: Number(c.toFixed(4)),
+        weight: agg.components[k].weight,
+      };
+    }
+    riskConfidence = {
       score: Number(riskScore.toFixed(3)),
       level: levelFromScore(riskScore),
-      factors: Object.fromEntries(
-        agg.contributing
-          .filter((k) => subindexConfidence[k] !== null)
-          .map((k) => [
-            k,
-            {
-              value: Number((subindexConfidence[k] as number).toFixed(4)),
-              weight: agg.components[k].weight,
-            },
-          ]),
-      ),
+      factors: riskFactors,
     };
+  }
 
   // --- Resolve gw_stress_model model_run_id for provenance linkage -------
   const modelRunId = await resolveGwStressModelRun(svc);
@@ -390,10 +405,18 @@ Deno.serve(async (req: Request): Promise<Response> => {
       model_run_id: modelRunId,
       computed_by: `edge:risk-score:${auth.userId}`,
     })
-    .select("id, source, dataset_id, ee_asset_id, period_start, period_end, processing_method, processing_version, parameters, model_run_id")
+    .select(
+      "id, source, dataset_id, ee_asset_id, period_start, period_end, processing_method, processing_version, parameters, model_run_id",
+    )
     .single();
   if (provErr || !provInsert) {
-    return fail(req, "INTERNAL", `Provenance insert failed: ${provErr?.message}`, undefined, requestId);
+    return fail(
+      req,
+      "INTERNAL",
+      `Provenance insert failed: ${provErr?.message}`,
+      undefined,
+      requestId,
+    );
   }
   const provenanceId = provInsert.id as string;
 
@@ -415,7 +438,13 @@ Deno.serve(async (req: Request): Promise<Response> => {
     .select("id")
     .single();
   if (rsErr || !rsInsert) {
-    return fail(req, "INTERNAL", `risk_scores insert failed: ${rsErr?.message}`, undefined, requestId);
+    return fail(
+      req,
+      "INTERNAL",
+      `risk_scores insert failed: ${rsErr?.message}`,
+      undefined,
+      requestId,
+    );
   }
   const riskScoreId = rsInsert.id as string;
 
@@ -427,7 +456,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       factor_key: k,
       factor_value: c.value, // normalized sub-index 0..100
       weight: c.weight,
-      weighted_value: Number(((c.weight * c.value)).toFixed(4)),
+      weighted_value: Number((c.weight * c.value).toFixed(4)),
       detail: {
         inherited_confidence: subindexConfidence[k],
         contribution: Number((c.weight * c.value).toFixed(2)),
@@ -553,7 +582,9 @@ async function loadProvenance(
 ): Promise<Provenance | null> {
   const { data: p } = await svc
     .from("provenance")
-    .select("id, source, dataset_id, ee_asset_id, period_start, period_end, processing_method, processing_version, parameters, model_run_id")
+    .select(
+      "id, source, dataset_id, ee_asset_id, period_start, period_end, processing_method, processing_version, parameters, model_run_id",
+    )
     .eq("id", provenanceId)
     .maybeSingle();
   if (!p) return null;
@@ -585,7 +616,7 @@ async function loadRiskConfidence(
   svc: ReturnType<typeof serviceClient>,
   riskScoreId: string,
   denormScore: number | null,
-) {
+): Promise<ConfidenceObject | undefined> {
   const { data: cs } = await svc
     .from("confidence_scores")
     .select("score, level, factors")
@@ -595,8 +626,8 @@ async function loadRiskConfidence(
   if (cs) {
     return {
       score: Number(cs.score),
-      level: cs.level,
-      factors: cs.factors as Record<string, { value: number; weight: number }>,
+      level: cs.level as ConfidenceLevel,
+      factors: cs.factors as ConfidenceFactors,
     };
   }
   if (denormScore !== null) {

@@ -12,7 +12,7 @@ import { Link } from "react-router-dom";
 import { useMemo } from "react";
 import { AZRAQ_CODE } from "@/lib/api";
 import { useIndicatorValues, useLatestRisk, useRegionByCode } from "@/lib/hooks";
-import { useReportDemo } from "@/components/DemoDataContext";
+import { useReportDemo } from "@/lib/demoData";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { MetricCard } from "@/components/MetricCard";
 import { StressClassBadge } from "@/components/StressClassBadge";

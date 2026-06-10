@@ -40,13 +40,7 @@
 
 import { handlePreflight } from "_shared/cors.ts";
 import { serviceClient } from "_shared/supabase.ts";
-import {
-  fail,
-  guard,
-  newRequestId,
-  ok,
-  parseJson,
-} from "_shared/http.ts";
+import { fail, guard, newRequestId, ok, parseJson } from "_shared/http.ts";
 import {
   buildConfidence,
   type FactorInputs,
@@ -57,11 +51,7 @@ import {
   spatialCoverageFraction,
   temporalCompleteness,
 } from "_shared/confidence.ts";
-import type {
-  ConfidenceRequest,
-  MetricKind,
-  Provenance,
-} from "_shared/types.ts";
+import type { ConfidenceRequest, MetricKind, Provenance } from "_shared/types.ts";
 
 const ENDPOINT = "confidence";
 const ALLOWED = ["analyst", "admin"] as const;
@@ -90,16 +80,37 @@ const MODEL_DERIVED_INDICATORS = new Set<string>([
 
 // Indicator groups where convergence applies (>=2 independent proxies) — docs/09 §5.
 const CONVERGENCE_INDICATORS = new Set<string>([
-  "ndvi", "evi", "savi", "ndvi_anomaly", "ndwi", "mndwi",
+  "ndvi",
+  "evi",
+  "savi",
+  "ndvi_anomaly",
+  "ndwi",
+  "mndwi",
   "surface_water_extent_km2",
-  "precip_mm", "precip_anomaly_pct", "spi_1", "spi_3", "spi_6", "spi_12",
-  "cropland_area_ha", "irrigated_area_ha", "crop_class", "agri_expansion_pct",
-  "recharge_proxy_mm", "abstraction_estimate_mcm", "water_balance_mcm",
+  "precip_mm",
+  "precip_anomaly_pct",
+  "spi_1",
+  "spi_3",
+  "spi_6",
+  "spi_12",
+  "cropland_area_ha",
+  "irrigated_area_ha",
+  "crop_class",
+  "agri_expansion_pct",
+  "recharge_proxy_mm",
+  "abstraction_estimate_mcm",
+  "water_balance_mcm",
 ]);
 
 // Optical indicators whose source_quality is cloud-driven — docs/09 §5.
 const OPTICAL_INDICATORS = new Set<string>([
-  "ndvi", "evi", "savi", "ndvi_anomaly", "ndwi", "mndwi", "surface_water_extent_km2",
+  "ndvi",
+  "evi",
+  "savi",
+  "ndvi_anomaly",
+  "ndwi",
+  "mndwi",
+  "surface_water_extent_km2",
 ]);
 
 function isIsoDate(s: unknown): s is string {
@@ -162,10 +173,22 @@ Deno.serve(async (req: Request): Promise<Response> => {
       .eq("code", body.indicator)
       .maybeSingle();
     if (indErr) {
-      return fail(req, "INTERNAL", `Indicator lookup failed: ${indErr.message}`, undefined, requestId);
+      return fail(
+        req,
+        "INTERNAL",
+        `Indicator lookup failed: ${indErr.message}`,
+        undefined,
+        requestId,
+      );
     }
     if (!ind) {
-      return fail(req, "NOT_FOUND", "Unknown indicator code.", { indicator: body.indicator }, requestId);
+      return fail(
+        req,
+        "NOT_FOUND",
+        "Unknown indicator code.",
+        { indicator: body.indicator },
+        requestId,
+      );
     }
     let q = svc
       .from("indicator_values")
@@ -180,7 +203,13 @@ Deno.serve(async (req: Request): Promise<Response> => {
       .limit(1)
       .maybeSingle();
     if (ivErr) {
-      return fail(req, "INTERNAL", `indicator_values lookup failed: ${ivErr.message}`, undefined, requestId);
+      return fail(
+        req,
+        "INTERNAL",
+        `indicator_values lookup failed: ${ivErr.message}`,
+        undefined,
+        requestId,
+      );
     }
     if (!ivRow) {
       return fail(
@@ -215,10 +244,22 @@ Deno.serve(async (req: Request): Promise<Response> => {
       .eq("id", metricId)
       .maybeSingle();
     if (error) {
-      return fail(req, "INTERNAL", `indicator_values read failed: ${error.message}`, undefined, requestId);
+      return fail(
+        req,
+        "INTERNAL",
+        `indicator_values read failed: ${error.message}`,
+        undefined,
+        requestId,
+      );
     }
     if (!iv) {
-      return fail(req, "NOT_FOUND", "indicator_value not found.", { metric_id: metricId }, requestId);
+      return fail(
+        req,
+        "NOT_FOUND",
+        "indicator_value not found.",
+        { metric_id: metricId },
+        requestId,
+      );
     }
     obsDate = iv.obs_date as string;
     provenanceId = iv.provenance_id as string;
@@ -228,7 +269,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       .select("code, category")
       .eq("id", iv.indicator_id as string)
       .maybeSingle();
-    indicatorCode = (ind?.code as string | undefined);
+    indicatorCode = ind?.code as string | undefined;
     indicatorCategory = (ind?.category as string | null) ?? null;
   } else if (metricKind !== "indicator_value") {
     // Other metric kinds: confirm existence + grab provenance + period.
@@ -264,7 +305,9 @@ Deno.serve(async (req: Request): Promise<Response> => {
   if (provenanceId) {
     const { data: p, error: pErr } = await svc
       .from("provenance")
-      .select("id, source, dataset_id, ee_asset_id, period_start, period_end, processing_method, processing_version, parameters, model_run_id")
+      .select(
+        "id, source, dataset_id, ee_asset_id, period_start, period_end, processing_method, processing_version, parameters, model_run_id",
+      )
       .eq("id", provenanceId)
       .maybeSingle();
     if (pErr) {
@@ -332,7 +375,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
   // source_quality (all metrics).
   const cloudFraction = num(provParams["cloud_fraction"]) ??
-    num((provParams["source_quality_inputs"] as Record<string, unknown> | undefined)?.["cloud_fraction"]);
+    num(
+      (provParams["source_quality_inputs"] as Record<string, unknown> | undefined)
+        ?.["cloud_fraction"],
+    );
   if (isOptical && cloudFraction !== undefined) {
     const sensorReliability = datasetSourceQuality ?? 1.0;
     factors.source_quality = sourceQualityOptical(cloudFraction, sensorReliability);
@@ -355,11 +401,14 @@ Deno.serve(async (req: Request): Promise<Response> => {
     if (provPeriodStart) oq = oq.gte("obs_time", `${provPeriodStart}T00:00:00Z`);
     if (provPeriodEnd) oq = oq.lte("obs_time", `${provPeriodEnd}T23:59:59Z`);
     const { data: obs } = await oq.limit(500);
-    if (obs && obs.length > 0) {
-      const vals = obs
+    const obsRows = (obs ?? []) as Array<Record<string, unknown>>;
+    if (obsRows.length > 0) {
+      const vals = obsRows
         .map((o) => (o.valid_pixel_fraction === null ? null : Number(o.valid_pixel_fraction)))
         .filter((x): x is number => x !== null);
-      if (vals.length > 0) coverage = vals.reduce((a, b) => a + b, 0) / vals.length;
+      if (vals.length > 0) {
+        coverage = vals.reduce((a: number, b: number) => a + b, 0) / vals.length;
+      }
     }
   }
   if (coverage !== undefined) factors.spatial_coverage = spatialCoverageFraction(coverage);
@@ -423,7 +472,13 @@ Deno.serve(async (req: Request): Promise<Response> => {
       { onConflict: "metric_kind,metric_id" },
     );
   if (csErr) {
-    return fail(req, "INTERNAL", `confidence_scores upsert failed: ${csErr.message}`, undefined, requestId);
+    return fail(
+      req,
+      "INTERNAL",
+      `confidence_scores upsert failed: ${csErr.message}`,
+      undefined,
+      requestId,
+    );
   }
 
   // Denormalize onto indicator_values.confidence for fast reads (docs/11 §6.6).

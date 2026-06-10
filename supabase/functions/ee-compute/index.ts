@@ -24,14 +24,7 @@
 
 import { handlePreflight } from "_shared/cors.ts";
 import { serviceClient } from "_shared/supabase.ts";
-import {
-  fail,
-  guard,
-  newRequestId,
-  ok,
-  parseJson,
-  PROCESSING_VERSION,
-} from "_shared/http.ts";
+import { fail, guard, newRequestId, ok, parseJson, PROCESSING_VERSION } from "_shared/http.ts";
 import {
   buildConfidence,
   type FactorInputs,
@@ -59,11 +52,28 @@ const MAX_AOI_KM2 = 5000;
 const WORKER_TIMEOUT_MS = Number(Deno.env.get("EE_WORKER_TIMEOUT_MS") ?? "55000");
 
 const OPTICAL_INDICATORS = new Set<string>([
-  "ndvi", "evi", "savi", "ndvi_anomaly", "ndwi", "mndwi", "surface_water_extent_km2",
+  "ndvi",
+  "evi",
+  "savi",
+  "ndvi_anomaly",
+  "ndwi",
+  "mndwi",
+  "surface_water_extent_km2",
 ]);
 const CONVERGENCE_INDICATORS = new Set<string>([
-  "ndvi", "evi", "savi", "ndvi_anomaly", "ndwi", "mndwi", "surface_water_extent_km2",
-  "precip_mm", "precip_anomaly_pct", "spi_1", "spi_3", "spi_6", "spi_12",
+  "ndvi",
+  "evi",
+  "savi",
+  "ndvi_anomaly",
+  "ndwi",
+  "mndwi",
+  "surface_water_extent_km2",
+  "precip_mm",
+  "precip_anomaly_pct",
+  "spi_1",
+  "spi_3",
+  "spi_6",
+  "spi_12",
 ]);
 
 function isIsoDate(s: unknown): s is string {
@@ -75,7 +85,9 @@ function num(v: unknown): number | undefined {
 }
 
 /** Validate a GeoJSON Polygon (closed linear rings, lon/lat in range). */
-function validatePolygon(aoi: unknown): { ok: true; poly: GeoJSONPolygon } | { ok: false; msg: string } {
+function validatePolygon(
+  aoi: unknown,
+): { ok: true; poly: GeoJSONPolygon } | { ok: false; msg: string } {
   if (!aoi || typeof aoi !== "object") return { ok: false, msg: "aoi must be a GeoJSON Polygon." };
   const p = aoi as Record<string, unknown>;
   if (p.type !== "Polygon") return { ok: false, msg: "aoi.type must be 'Polygon'." };
@@ -88,7 +100,9 @@ function validatePolygon(aoi: unknown): { ok: true; poly: GeoJSONPolygon } | { o
       return { ok: false, msg: "Each ring needs >= 4 positions (closed)." };
     }
     for (const pt of ring as unknown[]) {
-      if (!Array.isArray(pt) || pt.length < 2) return { ok: false, msg: "Each position needs [lon, lat]." };
+      if (!Array.isArray(pt) || pt.length < 2) {
+        return { ok: false, msg: "Each position needs [lon, lat]." };
+      }
       const [lon, lat] = pt as number[];
       if (typeof lon !== "number" || typeof lat !== "number") {
         return { ok: false, msg: "Coordinates must be numbers." };
@@ -157,24 +171,56 @@ Deno.serve(async (req: Request): Promise<Response> => {
   }
 
   if (!body || !Array.isArray(body.indicators) || body.indicators.length === 0) {
-    return fail(req, "VALIDATION_ERROR", "`indicators` must be a non-empty array.", undefined, requestId);
+    return fail(
+      req,
+      "VALIDATION_ERROR",
+      "`indicators` must be a non-empty array.",
+      undefined,
+      requestId,
+    );
   }
   if (body.indicators.some((i) => typeof i !== "string" || i.length === 0)) {
-    return fail(req, "VALIDATION_ERROR", "Each indicator must be a non-empty string code.", undefined, requestId);
+    return fail(
+      req,
+      "VALIDATION_ERROR",
+      "Each indicator must be a non-empty string code.",
+      undefined,
+      requestId,
+    );
   }
   if (!body.period || !isIsoDate(body.period.start) || !isIsoDate(body.period.end)) {
-    return fail(req, "VALIDATION_ERROR", "`period.start`/`period.end` must be ISO dates.", undefined, requestId);
+    return fail(
+      req,
+      "VALIDATION_ERROR",
+      "`period.start`/`period.end` must be ISO dates.",
+      undefined,
+      requestId,
+    );
   }
   if (body.period.end < body.period.start) {
-    return fail(req, "VALIDATION_ERROR", "`period.end` must be >= `period.start`.", undefined, requestId);
+    return fail(
+      req,
+      "VALIDATION_ERROR",
+      "`period.end` must be >= `period.start`.",
+      undefined,
+      requestId,
+    );
   }
   // No future end date (docs/17 §4.1 no-fabrication refinement).
   const todayIso = new Date().toISOString().slice(0, 10);
   if (body.period.end > todayIso) {
-    return fail(req, "VALIDATION_ERROR", "`period.end` cannot be in the future.", { today: todayIso }, requestId);
+    return fail(req, "VALIDATION_ERROR", "`period.end` cannot be in the future.", {
+      today: todayIso,
+    }, requestId);
   }
   if (!body.region_id && !body.aoi) {
-    return fail(req, "VALIDATION_ERROR", "Provide `region_id` or `aoi` (GeoJSON Polygon).", undefined, requestId);
+    return fail(
+      req,
+      "VALIDATION_ERROR",
+      "Provide `region_id` or `aoi` (GeoJSON Polygon).",
+      undefined,
+      requestId,
+    );
   }
 
   const svc = serviceClient();
@@ -251,7 +297,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
           req,
           "INTERNAL",
           `Failed to persist ad-hoc AOI region: ${insertRes.error?.message}`,
-          { hint: "Ensure regions.geom accepts GeoJSON (PostgREST geometry cast) or provide an insert_aoi_region RPC." },
+          {
+            hint:
+              "Ensure regions.geom accepts GeoJSON (PostgREST geometry cast) or provide an insert_aoi_region RPC.",
+          },
           requestId,
         );
       }
@@ -378,7 +427,13 @@ Deno.serve(async (req: Request): Promise<Response> => {
       request_id: requestId,
       error: err.message,
     });
-    return fail(req, "UPSTREAM_ERROR", `EE Worker call failed: ${err.message}`, undefined, requestId);
+    return fail(
+      req,
+      "UPSTREAM_ERROR",
+      `EE Worker call failed: ${err.message}`,
+      undefined,
+      requestId,
+    );
   }
 
   // Worker may also signal async via JSON body.
@@ -398,7 +453,13 @@ Deno.serve(async (req: Request): Promise<Response> => {
   }
 
   if (workerResp.status === "failed") {
-    return fail(req, "UPSTREAM_ERROR", workerResp.error ?? "EE Worker reported failure.", undefined, requestId);
+    return fail(
+      req,
+      "UPSTREAM_ERROR",
+      workerResp.error ?? "EE Worker reported failure.",
+      undefined,
+      requestId,
+    );
   }
 
   const results = workerResp.results ?? [];
@@ -425,11 +486,20 @@ Deno.serve(async (req: Request): Promise<Response> => {
     .select("id, code, category")
     .in("code", codes);
   if (indErr) {
-    return fail(req, "INTERNAL", `Indicator catalog read failed: ${indErr.message}`, undefined, requestId);
+    return fail(
+      req,
+      "INTERNAL",
+      `Indicator catalog read failed: ${indErr.message}`,
+      undefined,
+      requestId,
+    );
   }
   const codeToIndicator = new Map<string, { id: string; category: string | null }>();
-  for (const r of indRows ?? []) {
-    codeToIndicator.set(r.code as string, { id: r.id as string, category: (r.category as string | null) ?? null });
+  for (const ir of (indRows ?? []) as Array<Record<string, unknown>>) {
+    codeToIndicator.set(ir.code as string, {
+      id: ir.id as string,
+      category: (ir.category as string | null) ?? null,
+    });
   }
   const unknownCodes = codes.filter((c) => !codeToIndicator.has(c));
   if (unknownCodes.length > 0) {
@@ -443,21 +513,30 @@ Deno.serve(async (req: Request): Promise<Response> => {
   }
 
   // Dataset lookups (for source_quality prior, freshness cadence, attribution).
-  const datasetKeys = [...new Set(results.map((r) => r.dataset_key).filter((k): k is string => !!k))];
+  const datasetKeys = [
+    ...new Set(results.map((r) => r.dataset_key).filter((k): k is string => !!k)),
+  ];
   const datasetByKey = new Map<
     string,
-    { id: string; source_quality: number | null; freshness_threshold_days: number | null; attribution: string }
+    {
+      id: string;
+      source_quality: number | null;
+      freshness_threshold_days: number | null;
+      attribution: string;
+    }
   >();
   if (datasetKeys.length > 0) {
     const { data: dsRows } = await svc
       .from("datasets")
       .select("id, key, source_quality, freshness_threshold_days, attribution")
       .in("key", datasetKeys);
-    for (const d of dsRows ?? []) {
+    for (const d of (dsRows ?? []) as Array<Record<string, unknown>>) {
       datasetByKey.set(d.key as string, {
         id: d.id as string,
         source_quality: d.source_quality === null ? null : Number(d.source_quality),
-        freshness_threshold_days: d.freshness_threshold_days === null ? null : Number(d.freshness_threshold_days),
+        freshness_threshold_days: d.freshness_threshold_days === null
+          ? null
+          : Number(d.freshness_threshold_days),
         attribution: d.attribution as string,
       });
     }
@@ -496,10 +575,18 @@ Deno.serve(async (req: Request): Promise<Response> => {
         model_run_id: null,
         computed_by: `edge:ee-compute:${auth.userId}`,
       })
-      .select("id, source, dataset_id, ee_asset_id, period_start, period_end, processing_method, processing_version, parameters, model_run_id")
+      .select(
+        "id, source, dataset_id, ee_asset_id, period_start, period_end, processing_method, processing_version, parameters, model_run_id",
+      )
       .single();
     if (provErr || !prov) {
-      return fail(req, "INTERNAL", `Provenance insert failed: ${provErr?.message}`, undefined, requestId);
+      return fail(
+        req,
+        "INTERNAL",
+        `Provenance insert failed: ${provErr?.message}`,
+        undefined,
+        requestId,
+      );
     }
     const provId = prov.id as string;
 
@@ -519,7 +606,13 @@ Deno.serve(async (req: Request): Promise<Response> => {
       .select("id")
       .single();
     if (ivErr || !iv) {
-      return fail(req, "INTERNAL", `indicator_values insert failed: ${ivErr?.message}`, undefined, requestId);
+      return fail(
+        req,
+        "INTERNAL",
+        `indicator_values insert failed: ${ivErr?.message}`,
+        undefined,
+        requestId,
+      );
     }
     const ivId = iv.id as string;
 
@@ -618,9 +711,12 @@ async function loadCachedResults(
 
   const { data: siblingProv } = await svc
     .from("provenance")
-    .select("id, source, dataset_id, ee_asset_id, period_start, period_end, processing_method, processing_version, parameters, model_run_id")
+    .select(
+      "id, source, dataset_id, ee_asset_id, period_start, period_end, processing_method, processing_version, parameters, model_run_id",
+    )
     .contains("parameters", { idempotency_key: idemKey });
-  const provIds = (siblingProv ?? []).map((p) => p.id as string);
+  const provRows = (siblingProv ?? []) as Array<Record<string, unknown>>;
+  const provIds = provRows.map((p) => p.id as string);
   if (provIds.length === 0) return { results: [], provenance: [] };
 
   const { data: values } = await svc
@@ -629,24 +725,31 @@ async function loadCachedResults(
     .eq("region_id", regionId)
     .in("provenance_id", provIds)
     .order("obs_date", { ascending: false });
+  const valueRows = (values ?? []) as Array<Record<string, unknown>>;
 
-  const indIds = [...new Set((values ?? []).map((v) => v.indicator_id as string))];
+  const indIds = [...new Set(valueRows.map((v) => v.indicator_id as string))];
   const codeById = new Map<string, string>();
   if (indIds.length > 0) {
     const { data: inds } = await svc.from("indicators").select("id, code").in("id", indIds);
-    for (const i of inds ?? []) codeById.set(i.id as string, i.code as string);
+    for (const i of (inds ?? []) as Array<Record<string, unknown>>) {
+      codeById.set(i.id as string, i.code as string);
+    }
   }
 
   // Attribution per dataset.
-  const dsIds = [...new Set((siblingProv ?? []).map((p) => p.dataset_id).filter((x): x is string => !!x))];
+  const dsIds = [
+    ...new Set(provRows.map((p) => p.dataset_id).filter((x): x is string => !!x)),
+  ];
   const attrById = new Map<string, string>();
   if (dsIds.length > 0) {
     const { data: ds } = await svc.from("datasets").select("id, attribution").in("id", dsIds);
-    for (const d of ds ?? []) attrById.set(d.id as string, d.attribution as string);
+    for (const d of (ds ?? []) as Array<Record<string, unknown>>) {
+      attrById.set(d.id as string, d.attribution as string);
+    }
   }
 
   const results: EeComputeResultItem[] = [];
-  for (const v of values ?? []) {
+  for (const v of valueRows) {
     const score = v.confidence === null ? 0 : Number(v.confidence);
     results.push({
       indicator: codeById.get(v.indicator_id as string) ?? "unknown",
@@ -656,7 +759,7 @@ async function loadCachedResults(
       confidence: { score, level: score >= 0.8 ? "High" : score >= 0.5 ? "Medium" : "Low" },
     });
   }
-  const provenance: Provenance[] = (siblingProv ?? []).map((p) => ({
+  const provenance: Provenance[] = provRows.map((p) => ({
     id: p.id as string,
     source: p.source as string,
     dataset_id: p.dataset_id as string | null,

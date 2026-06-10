@@ -18,7 +18,6 @@ const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 export const isSupabaseConfigured: boolean = Boolean(url && anonKey);
 
 if (!isSupabaseConfigured && import.meta.env.DEV) {
-  // eslint-disable-next-line no-console
   console.warn(
     "[MIZAN] VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY not set — " +
       "reads and auth are disabled. Copy web/.env.example to web/.env.",

@@ -26,7 +26,7 @@ import {
 import { queryClient, queryKeys } from "@/lib/queryClient";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { useSession } from "@/lib/useSession";
-import { useReportDemo } from "@/components/DemoDataContext";
+import { useReportDemo } from "@/lib/demoData";
 import { MetricCard } from "@/components/MetricCard";
 import { StressClassBadge } from "@/components/StressClassBadge";
 import { RadialGauge } from "@/components/RadialGauge";

@@ -19,12 +19,9 @@ import maplibregl, {
   type MapGeoJSONFeature,
 } from "maplibre-gl";
 import type { GeoJsonGeometry } from "@/lib/types";
+import { JORDAN_VIEW } from "@/lib/geo";
 
 const MAPTILER_KEY = import.meta.env.VITE_MAPTILER_KEY;
-
-/** Default views (docs/13 §B.3). */
-export const JORDAN_VIEW = { center: [38.0, 31.5] as [number, number], zoom: 6.2 };
-export const AZRAQ_VIEW = { center: [36.8, 31.9] as [number, number], zoom: 8.2 };
 
 export interface MapRegionFeature {
   id: string;
@@ -76,7 +73,10 @@ function boundsOf(regions: MapRegionFeature[]): LngLatBoundsLike | null {
       r.geometry.type === "Polygon" ? [r.geometry.coordinates] : r.geometry.coordinates;
     for (const poly of polys) {
       for (const ring of poly) {
-        for (const [lng, lat] of ring) {
+        for (const coord of ring) {
+          const lng = coord[0];
+          const lat = coord[1];
+          if (lng === undefined || lat === undefined) continue;
           found = true;
           if (lng < w) w = lng;
           if (lng > e) e = lng;

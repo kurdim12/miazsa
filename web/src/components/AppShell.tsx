@@ -9,7 +9,7 @@
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { SyntheticDataBanner } from "@/components/SyntheticDataBanner";
 import { ScientificStanceNote } from "@/components/ScientificStanceNote";
-import { useHasDemoData } from "@/components/DemoDataContext";
+import { useHasDemoData } from "@/lib/demoData";
 import { useSession } from "@/lib/useSession";
 import { supabase } from "@/lib/supabase";
 import { t } from "@/lib/i18n";

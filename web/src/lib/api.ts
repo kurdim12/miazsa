@@ -18,8 +18,10 @@ import type {
   ConfidenceData,
   ConfidenceObject,
   Envelope,
+  Indicator,
   IndicatorValue,
   Period,
+  Provenance,
   Region,
   RiskScore,
   RiskScoreData,
@@ -55,6 +57,46 @@ const PROVENANCE_EMBED =
   "processing_version,parameters,model_run_id,datasets(name,attribution))";
 
 const INDICATOR_EMBED = "indicators(id,code,name_en,name_ar,unit,category,value_min,value_max,description)";
+
+// ---------------------------------------------------------------------------
+// Embed normalization.
+//
+// supabase-js types embedded relations as arrays, but a to-one (foreign-key)
+// embed returns a single object at runtime. These helpers coerce either shape to
+// a single object and re-shape rows into our domain types, casting through
+// `unknown` at the boundary (no `any`). They are runtime-safe whether PostgREST
+// returns an object or a one-element array.
+// ---------------------------------------------------------------------------
+
+/** Coerce a to-one embed (object | array | null) to a single object or null. */
+function toOne<T>(embed: unknown): T | null {
+  if (embed == null) return null;
+  if (Array.isArray(embed)) return (embed[0] as T | undefined) ?? null;
+  return embed as T;
+}
+
+/** Normalize a raw indicator_values row (with embeds) into IndicatorValue. */
+function normalizeIndicatorValue(raw: Record<string, unknown>): IndicatorValue {
+  const r = raw as unknown as IndicatorValue & {
+    provenance?: unknown;
+    indicators?: unknown;
+  };
+  const prov = toOne<Provenance>(r.provenance);
+  if (prov) prov.datasets = toOne<NonNullable<Provenance["datasets"]>>(prov.datasets ?? null);
+  return {
+    ...r,
+    provenance: prov,
+    indicators: toOne<Indicator>(r.indicators),
+  };
+}
+
+/** Normalize a raw risk_scores row (with provenance embed) into RiskScore. */
+function normalizeRiskScore(raw: Record<string, unknown>): RiskScore {
+  const r = raw as unknown as RiskScore & { provenance?: unknown };
+  const prov = toOne<Provenance>(r.provenance);
+  if (prov) prov.datasets = toOne<NonNullable<Provenance["datasets"]>>(prov.datasets ?? null);
+  return { ...r, provenance: prov };
+}
 
 // ---------------------------------------------------------------------------
 // Regions (docs/12 §2.1).
@@ -126,7 +168,7 @@ export async function getIndicatorValues(regionId: string): Promise<IndicatorVal
     .limit(500);
   if (error) throw new ApiError("INTERNAL", error.message);
 
-  const rows = (data ?? []) as IndicatorValue[];
+  const rows = ((data ?? []) as Record<string, unknown>[]).map(normalizeIndicatorValue);
   // Reduce to the latest row per indicator_id (rows are date-desc ordered).
   const latest = new Map<string, IndicatorValue>();
   for (const row of rows) {
@@ -151,7 +193,9 @@ export async function getIndicatorSeries(
   if (error) throw new ApiError("INTERNAL", error.message);
   // The embedded filter on indicators.code keeps only matching rows when the
   // join is present; guard against nulls just in case.
-  return ((data ?? []) as IndicatorValue[]).filter((r) => r.indicators?.code === indicatorCode);
+  return ((data ?? []) as Record<string, unknown>[])
+    .map(normalizeIndicatorValue)
+    .filter((r) => r.indicators?.code === indicatorCode);
 }
 
 // ---------------------------------------------------------------------------
@@ -169,7 +213,7 @@ export async function getLatestRisk(regionId: string): Promise<RiskScore | null>
     .limit(1)
     .maybeSingle();
   if (error) throw new ApiError("INTERNAL", error.message);
-  return (data as RiskScore | null) ?? null;
+  return data ? normalizeRiskScore(data as Record<string, unknown>) : null;
 }
 
 /** Full risk-score history for a region (ascending by period_end). */
@@ -184,7 +228,7 @@ export async function getRiskHistory(regionId: string): Promise<RiskScore[]> {
     .order("period_end", { ascending: true })
     .limit(500);
   if (error) throw new ApiError("INTERNAL", error.message);
-  return (data ?? []) as RiskScore[];
+  return ((data ?? []) as Record<string, unknown>[]).map(normalizeRiskScore);
 }
 
 // ---------------------------------------------------------------------------

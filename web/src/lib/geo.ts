@@ -10,6 +10,10 @@
 
 import type { GeoJsonGeometry, GeoJsonMultiPolygon, Region } from "@/lib/types";
 
+/** Default map views (docs/13 §B.3). */
+export const JORDAN_VIEW = { center: [38.0, 31.5] as [number, number], zoom: 6.2 };
+export const AZRAQ_VIEW = { center: [36.8, 31.9] as [number, number], zoom: 8.2 };
+
 /** Build a MultiPolygon from a [w,s,e,n] bbox. */
 function bboxPolygon(w: number, s: number, e: number, n: number): GeoJsonMultiPolygon {
   return {

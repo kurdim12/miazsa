@@ -23,7 +23,7 @@ import { EmptyState, ErrorState, LoadingState } from "@/components/States";
 import { resolveRegionGeometry, isApproximateGeometry } from "@/lib/geo";
 import { envelopeForIndicator, envelopeForRisk } from "@/lib/envelope";
 import { STRESS_COLORS, isDemoProvenance } from "@/lib/format";
-import { useReportDemo } from "@/components/DemoDataContext";
+import { useReportDemo } from "@/lib/demoData";
 import { t } from "@/lib/i18n";
 import type { Region, RiskScore } from "@/lib/types";
 

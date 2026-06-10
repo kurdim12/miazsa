@@ -311,7 +311,13 @@ export async function guard(
     }
     // Unexpected (e.g. missing env / network) -> 500, not a misleading 401.
     return {
-      response: fail(req, "INTERNAL", `Authentication failed: ${(e as Error).message}`, undefined, opts.requestId),
+      response: fail(
+        req,
+        "INTERNAL",
+        `Authentication failed: ${(e as Error).message}`,
+        undefined,
+        opts.requestId,
+      ),
     };
   }
 

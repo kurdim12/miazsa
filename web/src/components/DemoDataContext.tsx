@@ -1,29 +1,17 @@
 // =============================================================================
-// components/DemoDataContext.tsx — Tracks whether any displayed metric is demo.
+// components/DemoDataContext.tsx — Provider for the demo-data context.
 //
-// Pages call `useReportDemo(true)` when they detect a metric whose provenance
-// source starts with "ILLUSTRATIVE DEMO" (contract demo-data rule). The AppShell
-// reads `useHasDemoData()` to show the global SyntheticDataBanner.
+// Holds the set of keys currently reporting synthetic demo data and exposes
+// `hasDemo` to the AppShell's global SyntheticDataBanner. The context object and
+// the consumer hooks live in lib/demoData.ts (so this file only exports a
+// component — clean React Fast Refresh).
 // =============================================================================
 
+import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
 import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react";
-
-interface DemoDataContextValue {
-  hasDemo: boolean;
-  /** Register/deregister demo presence for a stable source key. */
-  setDemoForKey: (key: string, present: boolean) => void;
-}
-
-const DemoDataContext = createContext<DemoDataContextValue | null>(null);
+  DemoDataContext,
+  type DemoDataContextValue,
+} from "@/lib/demoData";
 
 export function DemoDataProvider({ children }: { children: ReactNode }) {
   const keysRef = useRef<Set<string>>(new Set());
@@ -43,22 +31,4 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
   );
 
   return <DemoDataContext.Provider value={value}>{children}</DemoDataContext.Provider>;
-}
-
-export function useHasDemoData(): boolean {
-  const ctx = useContext(DemoDataContext);
-  return ctx?.hasDemo ?? false;
-}
-
-/**
- * Report demo-data presence for the current view. Registers under a key on mount
- * /update and clears it on unmount, so the banner reflects the active page.
- */
-export function useReportDemo(present: boolean, key = "default"): void {
-  const ctx = useContext(DemoDataContext);
-  useEffect(() => {
-    if (!ctx) return;
-    ctx.setDemoForKey(key, present);
-    return () => ctx.setDemoForKey(key, false);
-  }, [ctx, key, present]);
 }
