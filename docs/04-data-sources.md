@@ -183,7 +183,7 @@ MIZAN's datasets fall into a **core** set (always used) and an **optional/enrich
 
 ## 4. Band & index derivation table
 
-All formulas are specified normatively in [06-remote-sensing-methods](./06-remote-sensing-methods.md); this table maps **source bands → indicator codes** for cross-reference and for the datasets→indicators mapping in §8.
+All formulas are specified normatively in [06-remote-sensing-methods](./06-remote-sensing-methods.md); this table maps **source bands → indicator codes** for cross-reference and for the datasets→indicators mapping in §10.
 
 | Indicator code | Formula (canonical) | Source bands / dataset | Notes |
 |----------------|---------------------|------------------------|-------|
@@ -345,6 +345,6 @@ This table connects raw datasets to the indicator codes they produce and to the 
 
 ---
 
-## 9. Data limitations summary (forward reference)
+## 11. Data limitations summary (forward reference)
 
 Each caveat above contributes to the honest limits enumerated in [20-limitations](./20-limitations.md): coarse precipitation/GRACE resolution, proxy (not direct) soil moisture, cloud gaps in optical data, static/old terrain and admin boundaries, reanalysis modeling assumptions, and — above all — that **none of these datasets observe groundwater directly**. MIZAN's value is in transparently combining them into bounded, traceable stress indicators, never in overclaiming what any single sensor can see.
