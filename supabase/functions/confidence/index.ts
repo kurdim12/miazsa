@@ -58,7 +58,6 @@ import {
   temporalCompleteness,
 } from "_shared/confidence.ts";
 import type {
-  ConfidenceFactorKey,
   ConfidenceRequest,
   MetricKind,
   Provenance,
@@ -238,12 +237,9 @@ Deno.serve(async (req: Request): Promise<Response> => {
       : metricKind === "prediction"
       ? "predictions"
       : "scenario_results";
-    const dateCol = metricKind === "risk_score" || metricKind === "scenario_result"
-      ? "provenance_id"
-      : "provenance_id";
     const { data: row, error } = await svc
       .from(table)
-      .select(`id, provenance_id`)
+      .select("id, provenance_id")
       .eq("id", metricId)
       .maybeSingle();
     if (error) {
@@ -253,7 +249,6 @@ Deno.serve(async (req: Request): Promise<Response> => {
       return fail(req, "NOT_FOUND", `${metricKind} not found.`, { metric_id: metricId }, requestId);
     }
     provenanceId = row.provenance_id as string;
-    void dateCol;
   }
 
   // --- Load provenance (for parameters, dataset, model_run, period) ------

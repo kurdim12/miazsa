@@ -59,7 +59,7 @@ def geojson_to_ee_geometry(geojson: dict) -> ee.Geometry:
 
     # ee.Geometry accepts a GeoJSON geometry dict directly (geodesic=False to
     # treat coordinates as planar lon/lat, matching stored EPSG:4326 polygons).
-    return ee.Geometry(geojson, opt_geodesic=False)
+    return ee.Geometry(geojson, geodesic=False)
 
 
 def resolve_aoi(

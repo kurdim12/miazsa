@@ -156,15 +156,15 @@ def _compute_spi3(
             .select("precipitation")
         )
         summed = ic.sum()
-        val = summed.reduceRegion(
+        # Years with no CHIRPS imagery reduce to null -> arrive as None in the
+        # client list and are filtered there (never fabricated as a number).
+        return summed.reduceRegion(
             reducer=ee.Reducer.mean(),
             geometry=aoi,
             scale=_SCALE_M,
             maxPixels=1e10,
             bestEffort=True,
         ).get("precipitation")
-        # Mask years with no imagery as -1 sentinel (dropped client-side).
-        return ee.Algorithms.If(ee.Algorithms.IsEqual(val, None), -1, val)
 
     baseline_list = years.map(_year_acc)
 

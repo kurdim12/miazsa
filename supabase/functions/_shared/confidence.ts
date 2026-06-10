@@ -13,8 +13,8 @@
 // =============================================================================
 
 import type {
-  ConfidenceFactor,
   ConfidenceFactorKey,
+  ConfidenceFactors,
   ConfidenceLevel,
   ConfidenceObject,
 } from "_shared/types.ts";
@@ -188,7 +188,7 @@ export function buildConfidence(
   const score = geometricMean(factors, weights);
   if (score === null) return null;
 
-  const out: Partial<Record<ConfidenceFactorKey, ConfidenceFactor>> = {};
+  const out: ConfidenceFactors = {};
   for (const key of usedKeys) {
     out[key] = {
       value: Number(clamp01(factors[key] as number).toFixed(4)),

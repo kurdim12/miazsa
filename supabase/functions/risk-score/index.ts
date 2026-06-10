@@ -43,7 +43,7 @@ import {
   surfaceWaterDecline,
   vegWaterDivergence,
 } from "_shared/risk.ts";
-import { buildConfidence, levelFromScore, weightedGeometricMean } from "_shared/confidence.ts";
+import { levelFromScore, weightedGeometricMean } from "_shared/confidence.ts";
 import type {
   Period,
   Provenance,

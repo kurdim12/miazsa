@@ -306,9 +306,12 @@ export async function guard(
   try {
     auth = await getAuth(req);
   } catch (e) {
-    const ae = e as AuthError;
+    if (e instanceof AuthError) {
+      return { response: fail(req, e.code, e.message, undefined, opts.requestId) };
+    }
+    // Unexpected (e.g. missing env / network) -> 500, not a misleading 401.
     return {
-      response: fail(req, ae.code ?? "UNAUTHENTICATED", ae.message, undefined, opts.requestId),
+      response: fail(req, "INTERNAL", `Authentication failed: ${(e as Error).message}`, undefined, opts.requestId),
     };
   }
 
@@ -340,11 +343,14 @@ export async function guard(
   return { auth };
 }
 
-/** Parse a JSON request body, throwing a VALIDATION_ERROR-friendly error. */
+/**
+ * Parse a JSON request body. Throws a plain Error on malformed JSON; callers
+ * catch it and return a VALIDATION_ERROR (400) with the message.
+ */
 export async function parseJson<T>(req: Request): Promise<T> {
   try {
     return (await req.json()) as T;
   } catch {
-    throw new AuthError("VALIDATION_ERROR", "Request body must be valid JSON.");
+    throw new Error("Request body must be valid JSON.");
   }
 }

@@ -42,6 +42,15 @@ export interface ConfidenceFactor {
 }
 
 /**
+ * The set of factors in a confidence breakdown, stored as {value, weight} per
+ * factor. For indicator/metric confidence the keys are the six docs/09 factors
+ * (see ConfidenceFactorKey); for the *risk* score the keys are the five
+ * sub-indices (docs/08 §6). A string-keyed map covers both and matches the
+ * generic jsonb storage in confidence_scores.factors (docs/11 §6.6).
+ */
+export type ConfidenceFactors = Record<string, ConfidenceFactor>;
+
+/**
  * The confidence object carried by every value-returning response
  * (docs/12 §1.6). `factors` holds the *used* factors with their renormalized
  * weights so the score is reproducible.
@@ -49,7 +58,7 @@ export interface ConfidenceFactor {
 export interface ConfidenceObject {
   score: number;
   level: ConfidenceLevel;
-  factors: Partial<Record<ConfidenceFactorKey, ConfidenceFactor>>;
+  factors: ConfidenceFactors;
 }
 
 // ---------------------------------------------------------------------------
@@ -251,7 +260,7 @@ export interface ConfidenceData {
   metric_id: string;
   score: number;
   level: ConfidenceLevel;
-  factors: Partial<Record<ConfidenceFactorKey, ConfidenceFactor>>;
+  factors: ConfidenceFactors;
 }
 
 // ---------------------------------------------------------------------------
@@ -307,7 +316,7 @@ export interface ConfidenceScoreRow {
   id: string;
   metric_kind: MetricKind;
   metric_id: string;
-  factors: Partial<Record<ConfidenceFactorKey, ConfidenceFactor>>;
+  factors: ConfidenceFactors;
   score: number;
   level: ConfidenceLevel;
 }
