@@ -254,7 +254,52 @@ Freshness directly feeds the **freshness factor (weight 0.20)** of the confidenc
 
 ---
 
-## 7. Licensing, attribution & data governance
+## 7. Required preprocessing — consolidated pipeline summary
+
+Every dataset passes through a deterministic preprocessing chain before any value is written, and **the exact steps + parameters are recorded in `provenance.parameters` / `processing_method` / `processing_version`** ([11-database-schema](./11-database-schema.md)). The normative implementations live in [05-earth-engine-pipelines](./05-earth-engine-pipelines.md) and [06-remote-sensing-methods](./06-remote-sensing-methods.md); this is the per-dataset checklist that makes outputs reproducible.
+
+| Dataset | Step 1 | Step 2 | Step 3 | Step 4 | Recorded params |
+|---------|--------|--------|--------|--------|-----------------|
+| Sentinel-2 SR | Join S2_CLOUD_PROBABILITY + SCL → cloud+shadow mask | Apply harmonization/reflectance offset; scale ÷10000 | Median composite over window | Clip to region; compute indices | `cloud_prob_threshold`, `composite`, `window`, `offset_applied` |
+| Sentinel-2 Cloud Prob | Join to S2 by system index | Threshold probability | Dilate + project cloud shadows | Combine with SCL classes | `cloud_prob_threshold`, `dilation_px` |
+| Sentinel-1 GRD | Filter IW, VV+VH, orbit consistency | Border-noise removal | Speckle filter (refined Lee / focal) | dB convert; RVI; clip | `orbit`, `speckle_kernel`, `window_px` |
+| CHIRPS daily | Sum to target window | Build climatology (mean/SD) | Anomaly / SPI fit (gamma→normal) | Zonal-reduce to region | `window`, `chirps_version`, `spi_scale` |
+| CHIRPS pentad | Aggregate pentads → month/season | Align with daily-final | SPI at coarse granularity | Zonal-reduce | `window`, `product=pentad` |
+| SRTM | `ee.Terrain` slope/aspect | Hydrological fill (if flow) | Flow accumulation (if watershed) | Clip | `fill`, `flow_threshold` |
+| FAO GAUL | Filter to Jordan | Simplify for render (keep full-res analysis copy) | Set SRID 4326 | Store region row | `simplify_tol`, `vintage=2015` |
+| Azraq boundary | Validate geometry (no self-intersect) | Set SRID 4326 | Label source (MWI vs derived) | Store basin region | `source`, `derivation_method` |
+| Landsat 8/9 L2 | Apply C2 scale/offset | QA_PIXEL bitmask cloud mask | Harmonize to S2-equivalent indices | Composite; clip | `scale`, `offset`, `qa_bits` |
+| SMAP L4 | Select sm_surface/sm_rootzone | Temporal aggregate (daily/weekly) | Zonal mean to region | Unit align | `agg`, `band`, `version=007` |
+| ERA5-Land | Aggregate hourly→daily | Unit convert (K→°C, J→MJ, dewpoint→RH) | Wind 10 m→2 m | FAO-56 ET0; clip | `agg`, `wind_conv`, `et0_method=PM` |
+| VIIRS DNB | Cloud-free monthly composite (cf_cvg) | Flare/outlier mask | Zonal stats | Label as proxy | `cf_cvg_min`, `flare_mask` |
+| GRACE mascon | Subset Jordan/regional window | Treat as regional context (no downscale) | Handle 2017–2018 gap | Unit align (LWE cm) | `version=V03_CRI`, `gap_handling` |
+
+**Why this matters for confidence.** Steps that fail or degrade lower specific confidence factors ([09-confidence-engine](./09-confidence-engine.md)): a high residual cloud fraction lowers **spatial_coverage**; a CHIRPS *preliminary* version lowers **source_quality**; missing scenes in a window lower **temporal_completeness**; agreement (or disagreement) between Sentinel-1 soil-moisture proxy and SMAP modulates **convergence**. The geometric-mean design means any one collapsed step honestly collapses the metric's confidence.
+
+---
+
+## 8. Data-quality flags & failure handling
+
+MIZAN never silently drops or guesses around bad data — it flags, attributes, and lets confidence reflect reality. Common quality conditions and the system response:
+
+| Condition | Affected datasets | Detection | Response | Confidence effect |
+|-----------|-------------------|-----------|----------|-------------------|
+| Persistent cloud cover | S2, Landsat | Valid-pixel fraction below threshold | Extend composite window or fall back to S1 (all-weather); flag | ↓ spatial_coverage |
+| Speckle / roughness artifacts | S1 | Variance/texture checks | Stronger speckle filter; angle normalization | ↓ source_quality if severe |
+| Sparse rain-gauge support | CHIRPS | Arid-region sparsity (known) | Use as coarse signal; cross-check ERA5 precip | bounded source_quality |
+| Preliminary vs final product | CHIRPS, ERA5 rolling | Version field | Use with explicit flag; recompute when final available | ↓ source_quality (keeps freshness) |
+| Missing scenes / revisit gaps | S2, S1, Landsat | Observation count vs expected | Aggregate over longer window; flag gap | ↓ temporal_completeness |
+| Sensor coarseness vs AOI | CHIRPS, SMAP, GRACE | Pixel size ≫ AOI | Restrict to appropriate scale (GRACE = regional only) | ↓ spatial_coverage / low weight |
+| Mission gap | GRACE (2017–2018) | Date range | Explicit gap handling; no interpolation passed off as data | flagged; low weight |
+| Bright salt-flat / sabkha confusion | S2 (water/cloud) | Spectral checks near Azraq | MNDWI tuning; mask sabkha | ↓ source_quality locally |
+| Static vintage drift | SRTM (2000), GAUL (2015) | Known epoch | Flag vintage; never imply currency | flagged (exempt from freshness) |
+| Proxy misinterpretation risk | VIIRS, S1 soil moisture, GRACE | By design | Label "proxy"/"context"; low weight; no direct claim | bounded weight |
+
+**Hard rule restated:** under no failure condition does MIZAN invent a value. If grounded data is insufficient, the pipeline writes nothing (or writes with low/`Low` confidence and an explicit flag), and the API returns an honest "insufficient data" response ([12-api-specification](./12-api-specification.md) §1.7). This is the operational expression of the non-negotiable charter: **every number from Earth Engine, stored datasets, or model outputs — never fabricated.**
+
+---
+
+## 9. Licensing, attribution & data governance
 
 | Dataset | License | Required attribution / citation |
 |---------|---------|--------------------------------|
@@ -277,7 +322,7 @@ Freshness directly feeds the **freshness factor (weight 0.20)** of the confidenc
 
 ---
 
-## 8. Dataset → indicators → deliverables mapping
+## 10. Dataset → indicators → deliverables mapping
 
 This table connects raw datasets to the indicator codes they produce and to the AstroCode deliverables they serve, closing the loop from source to value to story.
 
