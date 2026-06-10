@@ -292,6 +292,24 @@ Alerts inherit the score's confidence; low-confidence triggers are logged but no
 
 ---
 
+## 8a. Sub-index quick reference
+
+| Sub-index | Weight | Normalization | Worse direction | Primary indicators | Missing → |
+|---|---|---|---|---|---|
+| Abstraction pressure | 0.30 | baseline-referenced (`Q_safe`,`Q_max`) | higher abstraction | `abstraction_estimate_mcm`, `irrigated_area_ha`, `etc_mm` | drop crop / drop sub-index |
+| Recharge deficit | 0.25 | baseline z-score (SPI) | drier than normal | `spi_6`, `precip_anomaly_pct`, `recharge_proxy_mm` | fall back SPI window |
+| Vegetation–water divergence | 0.20 | min-max of divergence stat | green despite drought | `ndvi_anomaly`, `spi_3`, `et0_pm_mm` | drop sub-index |
+| Surface-water decline | 0.15 | baseline-referenced (`E_ref`) | smaller extent | `surface_water_extent_km2`, `mndwi` | SAR fallback |
+| Regional storage (GRACE) | 0.10 | baseline z-score (trend) | steeper decline | `gws_anomaly_cm` | drop sub-index |
+
+## 8b. Edge cases and guardrails
+
+- **All-but-one sub-index missing.** If only one sub-index is available, the index is reported with a prominent low-confidence flag and **not** used to raise alerts (insufficient corroboration). The single available sub-index is shown for transparency.
+- **Contradictory inputs.** Severe abstraction pressure coinciding with a large rainfall surplus (positive SPI) is internally inconsistent; the score is computed but flagged "review — divergent inputs," and the AI narrative must note the tension rather than smoothing it over.
+- **Wet-year masking.** A single wet season can transiently depress recharge deficit while structural over-abstraction persists; trend-aware reporting (multi-season `agri_expansion_pct` and rolling abstraction) prevents a wet year from being mistaken for recovery.
+- **Saturation.** Sub-indices are clipped to [0,100]; a value pinned at 100 is annotated as "at or beyond reference bound" so users know the true magnitude may exceed the displayed cap.
+- **Class flicker.** Near-threshold scores (±3 of a boundary) are labelled "near-threshold"; the alerting layer requires a sustained transition (e.g. two consecutive computations) before escalating a class change, avoiding noise.
+
 ## 9. Validation plan
 
 Validation of a proxy-based index cannot use a single ground-truth number; it is evidence-triangulation (detailed in [16-validation-framework](./16-validation-framework.md)):
