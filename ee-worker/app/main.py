@@ -88,6 +88,10 @@ class JobSpec(BaseModel):
     indicators: list[str] = Field(default_factory=list)
     period: Period
     options: ComputeOptions = Field(default_factory=ComputeOptions)
+    # persist=False -> compute-only: the ee-compute Edge Function persists,
+    # owning idempotency + audit_log (avoids double-writing). Default True for
+    # scheduled / direct worker jobs that write straight to Supabase.
+    persist: bool = True
 
 
 # ---------------------------------------------------------------------------
@@ -359,9 +363,11 @@ def compute(spec: JobSpec) -> dict[str, Any]:
         aoi = resolve_aoi(
             aoi_geojson=spec.aoi, region_id=spec.region_id, writer=writer
         )
-        if not aoi.region_id:
+        if spec.persist and not aoi.region_id:
             # indicator_values.region_id is NOT NULL -> we cannot persist values
             # for an ad-hoc GeoJSON AOI that does not map to a stored region.
+            # (Compute-only requests, persist=False, may omit region_id; the
+            # calling Edge Function owns persistence.)
             raise HTTPException(
                 status_code=422,
                 detail=(
@@ -407,46 +413,54 @@ def compute(spec: JobSpec) -> dict[str, Any]:
             )
             conf_obj = _build_confidence_object(conf_inputs)
 
-            # ---- write provenance (first; traceability spine) --------------
-            params = _provenance_parameters(res, spec, aoi, conf_inputs)
-            prov_row = build_provenance(
-                source="Earth Engine / Copernicus" if dataset_key != "chirps_daily"
-                else "Earth Engine / CHIRPS",
-                ee_asset_id=res.get("ee_asset_id"),
-                period_start=spec.period.start,
-                period_end=spec.period.end,
-                processing_method=res.get("processing_method", indicator),
-                processing_version=settings.processing_version,
-                computed_by=settings.computed_by,
-                image_count=res.get("image_count"),
-                parameters=params,
-                dataset_id=dataset_id,
-            )
-            provenance_id = writer.insert_provenance(prov_row)
-
-            # ---- write indicator value -------------------------------------
-            iv_row: dict[str, Any] = {
-                "region_id": aoi.region_id,
-                "indicator_id": indicator_id,
-                "obs_date": res["obs_date"],
-                "value": res["value"],
-                "provenance_id": provenance_id,
-            }
-            if conf_obj:
-                iv_row["confidence"] = conf_obj["score"]
-            indicator_value_id = writer.insert_indicator_value(iv_row)
-
-            # ---- write confidence (authoritative six-factor record) --------
-            if conf_obj:
-                writer.insert_confidence(
-                    {
-                        "metric_kind": "indicator_value",
-                        "metric_id": indicator_value_id,
-                        "factors": conf_obj["factors"],
-                        "score": conf_obj["score"],
-                        "level": conf_obj["level"],
-                    }
+            # ---- persist provenance / value / confidence (persist mode only)
+            # On-demand requests arrive via the ee-compute Edge Function with
+            # persist=False: that function owns persistence (idempotency +
+            # audit_log) to avoid double-writing. Scheduled / direct jobs persist
+            # here. Compute-only mode still returns the REAL computed values and
+            # confidence — we never fabricate; we only skip the DB writes.
+            provenance_id: str | None = None
+            if spec.persist:
+                # ---- write provenance (first; traceability spine) ----------
+                params = _provenance_parameters(res, spec, aoi, conf_inputs)
+                prov_row = build_provenance(
+                    source="Earth Engine / Copernicus" if dataset_key != "chirps_daily"
+                    else "Earth Engine / CHIRPS",
+                    ee_asset_id=res.get("ee_asset_id"),
+                    period_start=spec.period.start,
+                    period_end=spec.period.end,
+                    processing_method=res.get("processing_method", indicator),
+                    processing_version=settings.processing_version,
+                    computed_by=settings.computed_by,
+                    image_count=res.get("image_count"),
+                    parameters=params,
+                    dataset_id=dataset_id,
                 )
+                provenance_id = writer.insert_provenance(prov_row)
+
+                # ---- write indicator value ---------------------------------
+                iv_row: dict[str, Any] = {
+                    "region_id": aoi.region_id,
+                    "indicator_id": indicator_id,
+                    "obs_date": res["obs_date"],
+                    "value": res["value"],
+                    "provenance_id": provenance_id,
+                }
+                if conf_obj:
+                    iv_row["confidence"] = conf_obj["score"]
+                indicator_value_id = writer.insert_indicator_value(iv_row)
+
+                # ---- write confidence (authoritative six-factor record) ----
+                if conf_obj:
+                    writer.insert_confidence(
+                        {
+                            "metric_kind": "indicator_value",
+                            "metric_id": indicator_value_id,
+                            "factors": conf_obj["factors"],
+                            "score": conf_obj["score"],
+                            "level": conf_obj["level"],
+                        }
+                    )
 
             quality = {
                 "image_count": res.get("image_count"),

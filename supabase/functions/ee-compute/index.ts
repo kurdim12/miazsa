@@ -361,6 +361,9 @@ Deno.serve(async (req: Request): Promise<Response> => {
         },
         body: JSON.stringify({
           region_id: regionId,
+          // Compute-only: this Edge Function owns persistence (idempotency +
+          // audit_log), so the worker must NOT also write (avoids double-write).
+          persist: false,
           aoi: body.aoi ?? null,
           indicators: body.indicators,
           period: body.period,

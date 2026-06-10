@@ -6,7 +6,7 @@
 
 | | |
 |---|---|
-| **Status** | Phase 1 — Specification (documentation) |
+| **Status** | Phase 2 — Vertical slice (implementation in progress) |
 | **Primary use case** | Groundwater stress monitoring |
 | **Demo area** | Azraq Basin |
 | **Secondary scope** | National Jordan coverage |
@@ -80,6 +80,56 @@ See [`docs/19-astrocode-compliance.md`](./docs/19-astrocode-compliance.md) for t
 
 ## Project phases
 
-1. **Phase 1 — Specification** *(current)*: the 20 documents above.
-2. **Phase 2 — Implementation**: source code, database, API, EE services, React pages, report engine, auth, deployment.
-3. **Phase 3 — Production readiness**: caching, logging, monitoring, error handling, rate limiting, security headers, secrets management, performance.
+1. **Phase 1 — Specification** ✅ *(complete)*: the 20 documents above.
+2. **Phase 2 — Implementation** 🔨 *(in progress — vertical slice landed)*: an end-to-end slice proving the architecture (DB → EE Worker → Edge Functions → React for the Azraq Basin); full build to follow.
+3. **Phase 3 — Production readiness** ⏳: caching, logging, monitoring, error handling, rate limiting, security headers, secrets management, performance.
+
+---
+
+## Repository layout
+
+```
+miazsa/
+├── docs/                      # Phase 1 — the 20 specification documents
+├── supabase/
+│   ├── migrations/            # PostGIS schema, RLS, catalog seeds, illustrative demo seed
+│   ├── functions/             # Edge Functions: ee-compute, risk-score, confidence (+ _shared)
+│   └── config.toml            # Supabase local config
+├── ee-worker/                 # FastAPI + Google Earth Engine compute worker (Cloud Run)
+│   └── app/                   # main.py, pipelines/ (S2 indices, surface water, CHIRPS/SPI)
+├── web/                       # React 18 + TS + Vite frontend (National, Map, Azraq, Login)
+├── .env.example               # master environment template (copy per subsystem)
+└── README.md
+```
+
+## Vertical slice — what it proves
+
+The slice demonstrates the full traceable data path for the **Azraq Basin**:
+
+**EE Worker** (real Sentinel-2 / CHIRPS compute) → **Supabase** (`indicator_values` + `provenance` + `confidence_scores` + `risk_scores`) → **Edge Functions** (`risk-score`, `confidence`, `ee-compute`) → **React** (Azraq Intelligence + Jordan Map, with the 5-field **Validation Envelope** on every metric, honest empty states, and a synthetic-data banner).
+
+> **Data integrity:** real numbers come only from the EE Worker (live GEE compute). For a local demo without GEE credentials, an **optional, clearly-labelled illustrative seed** (`0011_seed_demo_ILLUSTRATIVE.sql`) populates Azraq with synthetic values — every such value carries `provenance.source = "ILLUSTRATIVE DEMO (synthetic)…"`, forced **Low** confidence, and triggers a prominent in-app banner. It is never presented as a real observation.
+
+## Running the vertical slice
+
+Prereqs: Node 20+, the [Supabase CLI](https://supabase.com/docs/guides/local-development), Docker (for Supabase local), and Python 3.11 (for the EE Worker). Copy `.env.example` values into `web/.env` and `ee-worker/.env`, and set Edge Function secrets.
+
+```bash
+# 1) Database (Supabase local): apply schema + catalogs + (optional) demo seed
+supabase start
+supabase db reset                 # runs migrations 0001–0011 (incl. illustrative demo seed)
+
+# 2) Edge Functions (Deno) — served by the Supabase CLI
+supabase functions serve          # ee-compute, risk-score, confidence
+
+# 3) EE Worker (requires real GEE service-account creds for live data)
+cd ee-worker && pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8080
+
+# 4) Frontend
+cd web && npm install && npm run dev    # http://localhost:5173
+```
+
+With the demo seed applied, the **Azraq Intelligence** page (`/azraq`) renders the groundwater-stress index, the five weighted sub-indices, and key indicators — each with its Validation Envelope — behind the illustrative-data banner. To populate **real** data, run an `ee-compute` request (or a direct EE Worker `/compute`) for `region_id = azraq_basin` with valid GEE credentials.
+
+See [`docs/18-deployment.md`](./docs/18-deployment.md) for the full deployment, Docker, and CI/CD design.
